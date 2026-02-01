@@ -2,7 +2,7 @@ import { Point } from "../types";
 
 // --- Configuration ---
 const RESAMPLE_POINTS_COUNT = 64; 
-const MAX_DISTANCE_THRESHOLD = 0.55; // Relaxed further for better 4 recognition
+const MAX_DISTANCE_THRESHOLD = 0.60; // Slightly increased for better flexibility
 const CONFIDENCE_GAP_THRESHOLD = 0.02; // Reduced gap requirement
 
 // --- Geometry Helpers ---
@@ -140,7 +140,10 @@ const RAW_TEMPLATES: Record<number, Point[][]> = {
     [{x:0,y:0.2}, {x:0.5,y:0}, {x:1,y:0.2}, {x:1,y:0.4}, {x:0,y:1}, {x:1,y:1}], // Standard
     [{x:0.1,y:0.3}, {x:0.5,y:0}, {x:0.9,y:0.3}, {x:0.2,y:0.9}, {x:1,y:0.9}] // Loopy base
   ],
-  3: [[{x:0.1,y:0.2}, {x:0.5,y:0}, {x:0.9,y:0.2}, {x:0.5,y:0.5}, {x:0.9,y:0.8}, {x:0.5,y:1}, {x:0.1,y:0.8}]],
+  3: [
+      [{x:0.1,y:0.2}, {x:0.5,y:0}, {x:0.9,y:0.2}, {x:0.5,y:0.5}, {x:0.9,y:0.8}, {x:0.5,y:1}, {x:0.1,y:0.8}],
+      [{x:0,y:0}, {x:1,y:0}, {x:0.5,y:0.4}, {x:1,y:0.8}, {x:0,y:1}] // Zig-zag 3
+  ],
   4: [
     [{x:0.8,y:1}, {x:0.8,y:0}, {x:0,y:0.6}, {x:1,y:0.6}], // Standard (Open top)
     [{x:0.7,y:1}, {x:0.7,y:0}, {x:0,y:0.5}, {x:0.7,y:0.5}], // Standard 2
@@ -150,8 +153,15 @@ const RAW_TEMPLATES: Record<number, Point[][]> = {
     [{x:0.8,y:1}, {x:0.8,y:0}, {x:0,y:0.7}, {x:0.8,y:0.7}] // Continuous "Lightning" stroke
   ],
   5: [
-    [{x:1,y:0}, {x:0,y:0}, {x:0,y:0.4}, {x:1,y:0.6}, {x:0.5,y:1}, {x:0,y:0.9}], // Standard
-    [{x:0.9,y:0}, {x:0.2,y:0}, {x:0.2,y:0.4}, {x:1,y:0.7}, {x:0.1,y:0.9}] // S-like
+    // Standard Continuous: Top-Right -> Top-Left -> Down -> Belly
+    [{x:1,y:0}, {x:0,y:0}, {x:0,y:0.45}, {x:1,y:0.6}, {x:0.6,y:1}, {x:0.1,y:0.85}],
+    // Curvy/S-like: Top-Right -> curve -> Bottom-Left (Soft corner)
+    [{x:0.9,y:0}, {x:0.1,y:0.1}, {x:0.1,y:0.5}, {x:0.9,y:0.7}, {x:0.2,y:1}],
+    // Boxy/Digital style
+    [{x:1,y:0}, {x:0,y:0}, {x:0,y:0.5}, {x:1,y:0.5}, {x:1,y:1}, {x:0,y:1}],
+    // Two-Stroke Simulation (Hat Last): Belly part -> Jump -> Hat part
+    // Flattened path behaves like: TopL -> MidL -> Belly -> BotL -> TopL -> TopR
+    [{x:0,y:0}, {x:0,y:0.5}, {x:1,y:0.7}, {x:0,y:1}, {x:0,y:0}, {x:1,y:0}]
   ],
   6: [
     [{x:0.8,y:0}, {x:0.1,y:0.4}, {x:0.1,y:0.9}, {x:0.9,y:0.9}, {x:0.9,y:0.5}, {x:0.2,y:0.5}], // Spiral (C shape)
@@ -233,8 +243,19 @@ function getStructuralPenalty(digit: number, points: Point[], bounds: {w: number
       break;
 
     case 5:
-      const hasSharpCorner = hasSharpTurn(norm, 0, 0.4, 110);
-      if (!hasSharpCorner) penalty += 0.4; 
+      // KEY IDENTIFIER: The "Neck"
+      // 5 has structure in the top-left quadrant (vertical line down). 3 does not.
+      const dTopLeft = getZoneDensity(norm, 0, 0.4, 0, 0.45);
+      if (dTopLeft < 0.08) penalty += 0.5;
+
+      // End point check: 5 usually ends in the bottom, often bottom-left
+      if (end.y < 0.5) penalty += 0.6; 
+      
+      // If it looks too much like a circle/6 (loop closed at bottom-left)
+      // Check if start is near bottom-left? No, 5 starts Top.
+      // But if start is in bottom half, it's definitely not a standard 5
+      if (start.y > 0.6) penalty += 0.8; 
+
       break;
 
     case 6:
@@ -307,6 +328,8 @@ export const recognizeDigit = (strokes: Point[][]): number | null => {
 
     for (const t of variations) {
       const d1 = pathDistance(points, t);
+      // d2 is reverse path. Note: Numbers like 5 and 2 are direction sensitive.
+      // Reversing them usually yields a bad match, but we keep it for weird stroke orders.
       const d2 = pathDistance(points, [...t].reverse());
       minDist = Math.min(minDist, Math.min(d1, d2));
     }

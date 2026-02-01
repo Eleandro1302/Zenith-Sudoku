@@ -5,6 +5,7 @@ import SudokuCell from './components/SudokuCell';
 import Controls from './components/Controls';
 import { CellData, Difficulty, InputMode, DisplayMode, GameState } from './types';
 import { Trophy, Settings, Loader2, Play, Pause, Grid3x3, Flame, Sparkles, Brain, ChevronRight, XCircle, Linkedin, RefreshCw, History } from 'lucide-react';
+import confetti from 'canvas-confetti';
 
 // --- Types for Storage ---
 interface SavedGame {
@@ -199,7 +200,38 @@ const App: React.FC = () => {
     }
   }, [board, difficulty, timer, mistakes, history, historyIndex, hintsRemaining, status]);
 
-  // --- Auto-Restart Logic ---
+  // --- Fireworks & Celebration Effect ---
+  useEffect(() => {
+    if (status === 'won') {
+        // Clear save on win
+        localStorage.removeItem(STORAGE_KEY);
+        setSavedGame(null);
+
+        // Fire fireworks
+        const duration = 5 * 1000;
+        const animationEnd = Date.now() + duration;
+        const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 50 };
+
+        const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+
+        const interval = setInterval(function() {
+            const timeLeft = animationEnd - Date.now();
+
+            if (timeLeft <= 0) {
+                return clearInterval(interval);
+            }
+
+            const particleCount = 50 * (timeLeft / duration);
+            // since particles fall down, start a bit higher than random
+            confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
+            confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
+        }, 250);
+
+        return () => clearInterval(interval);
+    }
+  }, [status]);
+
+  // --- Auto-Restart Logic (Loss only) ---
   useEffect(() => {
     let timer: ReturnType<typeof setInterval>;
     if (status === 'lost') {
@@ -218,10 +250,6 @@ const App: React.FC = () => {
                 return prev - 1;
             });
         }, 1000);
-    } else if (status === 'won') {
-        // Clear save on win
-        localStorage.removeItem(STORAGE_KEY);
-        setSavedGame(null);
     }
     return () => {
         if(timer) clearInterval(timer);
@@ -569,8 +597,8 @@ const App: React.FC = () => {
              {/* Win Overlay */}
              {status === 'won' && (
                 <div className="absolute inset-0 bg-indigo-600/90 backdrop-blur-md flex flex-col items-center justify-center z-30 rounded-xl text-white p-6 text-center animate-in zoom-in">
-                    <Trophy size={64} className="mb-4 text-yellow-300 drop-shadow-lg" />
-                    <h2 className="text-3xl font-bold mb-2">Solved!</h2>
+                    <Trophy size={64} className="mb-4 text-yellow-300 drop-shadow-lg animate-bounce" />
+                    <h2 className="text-4xl font-extrabold mb-2 tracking-tight">Congratulations!</h2>
                     <p className="text-indigo-100 mb-6">Masterfully done in {formatTime(timer)}.</p>
                     <div className="flex gap-4">
                         <button 
