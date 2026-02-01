@@ -43,7 +43,7 @@ const SudokuCell: React.FC<SudokuCellProps> = ({
   }, []);
 
   // Styling logic
-  const baseClasses = "relative flex items-center justify-center text-xl sm:text-2xl md:text-3xl cursor-pointer select-none transition-all duration-200 border-r border-b border-slate-300 dark:border-slate-700";
+  const baseClasses = "relative flex items-center justify-center text-xl sm:text-2xl md:text-3xl cursor-pointer select-none transition-all duration-200 border-r border-b border-slate-300 dark:border-slate-700 overflow-hidden";
   
   let bgClass = "bg-white dark:bg-slate-800";
   if (cell.isError) bgClass = "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400";
@@ -76,7 +76,6 @@ const SudokuCell: React.FC<SudokuCellProps> = ({
     
     // Allow dragging fixed cells to select, but not write
     if (cell.isFixed) {
-        // Just trigger click immediately for selection feel, no writing
         onClick();
         return;
     }
@@ -86,8 +85,15 @@ const SudokuCell: React.FC<SudokuCellProps> = ({
 
     isInteractionRef.current = true;
     startPosRef.current = { x: e.clientX, y: e.clientY };
-    hasMovedRef.current = false;
     
+    // PEN OPTIMIZATION: Immediate start
+    const isPen = e.pointerType === 'pen';
+    hasMovedRef.current = isPen;
+    
+    if (isPen) {
+        setIsDrawing(true);
+    }
+
     // Prepare stroke
     if (canvasRef.current) {
         const rect = canvasRef.current.getBoundingClientRect();
@@ -97,7 +103,7 @@ const SudokuCell: React.FC<SudokuCellProps> = ({
         }];
     }
     
-    // Cancel any pending recognition if the user starts writing again quickly
+    // Cancel any pending recognition
     if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
@@ -110,18 +116,12 @@ const SudokuCell: React.FC<SudokuCellProps> = ({
     const x = e.clientX;
     const y = e.clientY;
 
-    // Detection Threshold
+    // Detection Threshold (Only for touch/mouse, ignored for Pen)
     if (!hasMovedRef.current) {
         const dist = Math.hypot(x - startPosRef.current.x, y - startPosRef.current.y);
         if (dist > 8) { // 8px threshold
             hasMovedRef.current = true;
             setIsDrawing(true);
-            
-            // If we just started drawing, select this cell if it wasn't already
-            if (!isSelected) {
-                // We don't call onClick here to avoid state thrashing, 
-                // but visual feedback happens via canvas
-            }
         }
     }
 
@@ -151,14 +151,14 @@ const SudokuCell: React.FC<SudokuCellProps> = ({
     target.releasePointerCapture(e.pointerId);
 
     if (!hasMovedRef.current) {
-        // Tap detected
+        // Tap detected (Finger/Mouse only)
         onClick();
         // Clear potential single dot
         const ctx = canvasRef.current?.getContext('2d');
         ctx?.clearRect(0, 0, 80, 80);
     } else {
         // Gesture finished
-        if (currentStroke.current.length > 2) { // Ignore tiny accidents
+        if (currentStroke.current.length > 2) { 
              strokes.current.push([...currentStroke.current]);
              
              // Auto-recognize after delay
@@ -174,11 +174,35 @@ const SudokuCell: React.FC<SudokuCellProps> = ({
   const processHandwriting = () => {
     if (strokes.current.length === 0) return;
 
+    // --- Smart Note Detection ---
+    // Analyze if the drawing is "Small" (Note) or "Big" (Value)
+    // Only applies if global mode is 'numpad'. If 'note', always note.
+    let targetMode: 'value' | 'note' = mode === 'note' ? 'note' : 'value';
+
+    if (mode === 'numpad') {
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        strokes.current.flat().forEach(p => {
+            minX = Math.min(minX, p.x);
+            maxX = Math.max(maxX, p.x);
+            minY = Math.min(minY, p.y);
+            maxY = Math.max(maxY, p.y);
+        });
+
+        const width = maxX - minX;
+        const height = maxY - minY;
+        const canvasSize = 80; // Match width/height in render
+        
+        // Threshold: If drawing is smaller than 55% of cell area, treat as note
+        // This allows writing small numbers in corners/sides to act as notes
+        if (width < canvasSize * 0.55 && height < canvasSize * 0.55) {
+            targetMode = 'note';
+        }
+    }
+
     const digit = recognizeDigit(strokes.current);
     
     if (digit !== null) {
-       // If in Note mode, input as note. Otherwise as value.
-       onInput(digit, mode === 'note' ? 'note' : 'value');
+       onInput(digit, targetMode);
     }
 
     // Reset
@@ -195,7 +219,7 @@ const SudokuCell: React.FC<SudokuCellProps> = ({
       className={`${baseClasses} ${bgClass}`}
       style={{ 
           aspectRatio: '1/1',
-          touchAction: 'none' // CRITICAL: Disables browser scrolling on the cell to allow drawing
+          touchAction: 'none'
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -213,24 +237,24 @@ const SudokuCell: React.FC<SudokuCellProps> = ({
         )
       )}
 
-      {/* Pencil Marks / Notes */}
-      {!cell.value && cell.notes.length > 0 && (
-        <div className="grid grid-cols-3 gap-0.5 p-0.5 w-full h-full pointer-events-none">
+      {/* Pencil Marks / Notes - Always visible if value is empty */}
+      {!cell.value && (
+        <div className="grid grid-cols-3 gap-0.5 p-0.5 w-full h-full pointer-events-none opacity-80">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
-            <div key={n} className="flex items-center justify-center text-[8px] sm:text-[10px] leading-none text-slate-500 dark:text-slate-400">
+            <div key={n} className="flex items-center justify-center text-[9px] sm:text-[11px] font-medium leading-none text-slate-500 dark:text-slate-400">
               {cell.notes.includes(n) ? n : ''}
             </div>
           ))}
         </div>
       )}
 
-      {/* Handwriting Layer - Always present now */}
+      {/* Handwriting Layer */}
       {!cell.isFixed && (
         <canvas 
             ref={canvasRef}
-            width={80} // Internal res
+            width={80} 
             height={80}
-            className="absolute inset-0 w-full h-full pointer-events-none" // Events handled by parent div
+            className="absolute inset-0 w-full h-full pointer-events-none" 
         />
       )}
     </div>

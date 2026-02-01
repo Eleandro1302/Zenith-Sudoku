@@ -2,8 +2,8 @@ import { Point } from "../types";
 
 // --- Configuration ---
 const RESAMPLE_POINTS_COUNT = 64; 
-const MAX_DISTANCE_THRESHOLD = 0.50; // Slightly relaxed to allow more variations
-const CONFIDENCE_GAP_THRESHOLD = 0.05; // Adjusted for better acceptance of variants
+const MAX_DISTANCE_THRESHOLD = 0.55; // Relaxed further for better 4 recognition
+const CONFIDENCE_GAP_THRESHOLD = 0.02; // Reduced gap requirement
 
 // --- Geometry Helpers ---
 
@@ -142,9 +142,12 @@ const RAW_TEMPLATES: Record<number, Point[][]> = {
   ],
   3: [[{x:0.1,y:0.2}, {x:0.5,y:0}, {x:0.9,y:0.2}, {x:0.5,y:0.5}, {x:0.9,y:0.8}, {x:0.5,y:1}, {x:0.1,y:0.8}]],
   4: [
-    [{x:0.8,y:1}, {x:0.8,y:0}, {x:0,y:0.6}, {x:1,y:0.6}], // Standard
-    [{x:0.7,y:1}, {x:0.7,y:0}, {x:0,y:0.5}, {x:0.7,y:0.5}], // Open top
-    [{x:1,y:1}, {x:1,y:0}, {x:0,y:0.7}, {x:1,y:0.7}] // L-shape
+    [{x:0.8,y:1}, {x:0.8,y:0}, {x:0,y:0.6}, {x:1,y:0.6}], // Standard (Open top)
+    [{x:0.7,y:1}, {x:0.7,y:0}, {x:0,y:0.5}, {x:0.7,y:0.5}], // Standard 2
+    [{x:1,y:1}, {x:1,y:0}, {x:0,y:0.7}, {x:1,y:0.7}], // L-shape
+    [{x:0.75,y:1}, {x:0.75,y:0}, {x:0,y:0.65}, {x:1,y:0.65}], // Cross low
+    [{x:0.2,y:0}, {x:0.2,y:0.5}, {x:1,y:0.5}, {x:1,y:0}, {x:1,y:1}], // U shape 4
+    [{x:0.8,y:1}, {x:0.8,y:0}, {x:0,y:0.7}, {x:0.8,y:0.7}] // Continuous "Lightning" stroke
   ],
   5: [
     [{x:1,y:0}, {x:0,y:0}, {x:0,y:0.4}, {x:1,y:0.6}, {x:0.5,y:1}, {x:0,y:0.9}], // Standard
@@ -221,8 +224,12 @@ function getStructuralPenalty(digit: number, points: Point[], bounds: {w: number
       break;
 
     case 4:
-      if (dCenter < 0.1) penalty += 0.3;
-      if (distance(start, {x:1, y:0.5}) < 0.3) penalty += 0.5; 
+      // 4 is complex. It usually has vertical lines.
+      // Often has a crossing in the middle-ish.
+      // If start is top-left and end is bottom-right, it could be a 4 or an X.
+      
+      // Reduce penalty for 4 to be more permissive due to variations
+      if (dCenter < 0.05) penalty += 0.1; 
       break;
 
     case 5:

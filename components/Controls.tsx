@@ -13,6 +13,7 @@ interface ControlsProps {
   onHint: () => void;
   canUndo: boolean;
   hintsRemaining: number;
+  completedNumbers?: number[]; // Numbers that are done (9 instances)
 }
 
 const Controls: React.FC<ControlsProps> = ({
@@ -24,14 +25,15 @@ const Controls: React.FC<ControlsProps> = ({
   onErase,
   onHint,
   canUndo,
-  hintsRemaining
+  hintsRemaining,
+  completedNumbers = []
 }) => {
   
   const btnClass = "flex flex-col items-center justify-center p-2 sm:p-4 rounded-xl transition-all active:scale-95 select-none";
   const activeClass = "bg-indigo-600 text-white shadow-lg shadow-indigo-500/30";
   const inactiveClass = "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 shadow-sm";
 
-  const numBtnClass = "h-12 sm:h-16 text-xl sm:text-2xl font-medium rounded-lg bg-indigo-50 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-slate-700 hover:bg-indigo-100 dark:hover:bg-slate-700 active:bg-indigo-200 transition-colors shadow-sm flex items-center justify-center p-0.5 sm:p-1";
+  const numBtnClass = "h-12 sm:h-16 text-xl sm:text-2xl font-medium rounded-lg bg-indigo-50 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-slate-700 hover:bg-indigo-100 dark:hover:bg-slate-700 active:bg-indigo-200 transition-colors shadow-sm flex items-center justify-center p-0.5 sm:p-1 disabled:opacity-0 disabled:pointer-events-none";
 
   return (
     <div className="w-full max-w-xl mx-auto space-y-4 sm:space-y-6 mt-2">
@@ -82,19 +84,24 @@ const Controls: React.FC<ControlsProps> = ({
 
       {/* Unified Numpad (1-9) - Single Row */}
       <div className="grid grid-cols-9 gap-1 sm:gap-2 px-1">
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-            <button
-            key={num}
-            onClick={() => onNumberClick(num)}
-            className={numBtnClass}
-            >
-            {displayMode === 'abacus' ? (
-                <div className="w-full h-full p-0.5"><AbacusDisplay value={num} /></div>
-            ) : (
-                num
-            )}
-            </button>
-        ))}
+        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => {
+            const isCompleted = completedNumbers.includes(num);
+            return (
+                <button
+                    key={num}
+                    onClick={() => onNumberClick(num)}
+                    disabled={isCompleted}
+                    className={numBtnClass}
+                    style={isCompleted ? { opacity: 0, visibility: 'hidden' } : {}}
+                >
+                    {displayMode === 'abacus' ? (
+                        <div className="w-full h-full p-0.5"><AbacusDisplay value={num} /></div>
+                    ) : (
+                        num
+                    )}
+                </button>
+            );
+        })}
       </div>
 
       {/* Helper Text */}

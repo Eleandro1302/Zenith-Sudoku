@@ -1,20 +1,42 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { generateSudoku, createEmptyBoard } from './services/sudokuGenerator';
 import { getSmartHint } from './services/geminiService';
 import SudokuCell from './components/SudokuCell';
 import Controls from './components/Controls';
-import { CellData, Difficulty, InputMode, DisplayMode } from './types';
-import { Trophy, Settings, Loader2, Play, Pause, Grid3x3, Flame, Sparkles, Brain, ChevronRight, XCircle, Linkedin } from 'lucide-react';
+import { CellData, Difficulty, InputMode, DisplayMode, GameState } from './types';
+import { Trophy, Settings, Loader2, Play, Pause, Grid3x3, Flame, Sparkles, Brain, ChevronRight, XCircle, Linkedin, RefreshCw, History } from 'lucide-react';
+
+// --- Types for Storage ---
+interface SavedGame {
+  board: CellData[][];
+  difficulty: Difficulty;
+  timer: number;
+  mistakes: number;
+  history: CellData[][][];
+  historyIndex: number;
+  hintsRemaining: number;
+  date: number;
+}
 
 // --- Intro Component ---
-const IntroView: React.FC<{ onStart: (diff: Difficulty) => void }> = ({ onStart }) => {
+const IntroView: React.FC<{ 
+  onStart: (diff: Difficulty) => void, 
+  onResume: () => void,
+  savedGame: SavedGame | null 
+}> = ({ onStart, onResume, savedGame }) => {
   const [selectedDiff, setSelectedDiff] = useState<Difficulty>('Easy');
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6 animate-in fade-in duration-700 text-slate-900 dark:text-slate-100 font-sans selection:bg-indigo-100">
       
       {/* Logo Area */}
-      <div className="relative mb-10 group cursor-default">
+      <div className="relative mb-8 group cursor-default">
         <div className="absolute inset-0 bg-indigo-500 blur-2xl opacity-20 group-hover:opacity-30 transition-opacity rounded-full" />
         <div className="relative w-24 h-24 bg-white dark:bg-slate-900 rounded-3xl shadow-2xl shadow-indigo-500/10 flex items-center justify-center border border-slate-200 dark:border-slate-800 transform -rotate-6 transition-transform group-hover:rotate-0 duration-500">
           <Grid3x3 size={48} className="text-indigo-600 dark:text-indigo-400" />
@@ -22,8 +44,8 @@ const IntroView: React.FC<{ onStart: (diff: Difficulty) => void }> = ({ onStart 
       </div>
       
       {/* Title */}
-      <div className="text-center mb-12 space-y-3">
-        <h1 className="text-5xl font-bold tracking-tight text-slate-900 dark:text-white">
+      <div className="text-center mb-10 space-y-2">
+        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-slate-900 dark:text-white">
           Zenith <span className="text-indigo-600 dark:text-indigo-400">Sudoku</span>
         </h1>
         <p className="text-slate-500 dark:text-slate-400 text-lg font-medium">
@@ -32,11 +54,40 @@ const IntroView: React.FC<{ onStart: (diff: Difficulty) => void }> = ({ onStart 
       </div>
 
       {/* Controls */}
-      <div className="w-full max-w-sm space-y-8">
+      <div className="w-full max-w-sm space-y-6">
         
+        {/* RESUME BUTTON (If save exists) */}
+        {savedGame && (
+          <div className="animate-in slide-in-from-bottom-2 fade-in duration-500">
+             <button
+              onClick={onResume}
+              className="w-full group relative overflow-hidden bg-white dark:bg-slate-900 border-2 border-indigo-100 dark:border-indigo-900/50 hover:border-indigo-500 dark:hover:border-indigo-500 rounded-2xl p-4 text-left transition-all shadow-lg hover:shadow-indigo-500/10"
+             >
+                <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold text-indigo-500 uppercase tracking-wider flex items-center gap-1">
+                        <History size={12} /> Resume Game
+                    </span>
+                    <span className="text-xs font-mono text-slate-400">{formatTime(savedGame.timer)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                    <span className="text-lg font-bold text-slate-800 dark:text-slate-200">
+                        {savedGame.difficulty}
+                    </span>
+                    <ChevronRight size={20} className="text-slate-300 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all" />
+                </div>
+                <div className="absolute inset-0 bg-indigo-50 dark:bg-indigo-900/20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+             </button>
+             
+             <div className="relative flex items-center py-4">
+                <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
+                <span className="flex-shrink-0 mx-4 text-xs font-bold text-slate-400 uppercase">Or Start New</span>
+                <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
+             </div>
+          </div>
+        )}
+
         {/* Difficulty Selector */}
         <div className="space-y-3">
-          <div className="text-xs font-bold text-slate-400 uppercase tracking-wider text-center">Select Difficulty</div>
           <div className="grid grid-cols-3 gap-2 p-1.5 bg-slate-200/50 dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-slate-800 backdrop-blur-sm">
             {(['Easy', 'Medium', 'Hard'] as Difficulty[]).map((d) => (
               <button
@@ -54,7 +105,7 @@ const IntroView: React.FC<{ onStart: (diff: Difficulty) => void }> = ({ onStart 
               </button>
             ))}
           </div>
-          <div className="text-center text-xs text-slate-400 pt-1">
+          <div className="text-center text-xs text-slate-400 pt-1 h-4">
              {selectedDiff === 'Easy' && 'Unlimited mistakes'}
              {selectedDiff === 'Medium' && 'Limit: 20 mistakes'}
              {selectedDiff === 'Hard' && 'Limit: 5 mistakes'}
@@ -67,14 +118,14 @@ const IntroView: React.FC<{ onStart: (diff: Difficulty) => void }> = ({ onStart 
           className="group w-full py-4 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white rounded-2xl font-bold text-xl shadow-xl shadow-indigo-500/25 active:scale-95 transition-all flex items-center justify-center gap-3 relative overflow-hidden"
         >
           <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 rounded-2xl" />
-          <span className="relative">Start Game</span>
+          <span className="relative">Start New Game</span>
           <ChevronRight className="relative group-hover:translate-x-1 transition-transform" />
         </button>
       </div>
 
       {/* Footer */}
-      <div className="mt-16 flex flex-col items-center gap-4">
-        <span className="text-slate-400 text-sm font-medium opacity-60">v1.2.0</span>
+      <div className="mt-12 flex flex-col items-center gap-4">
+        <span className="text-slate-400 text-sm font-medium opacity-60">v1.3.0</span>
         <a 
           href="https://www.linkedin.com/in/eleandro-mangrich?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=ios_app" 
           target="_blank" 
@@ -97,6 +148,8 @@ const getMistakeLimit = (diff: Difficulty): number => {
   }
 };
 
+const STORAGE_KEY = 'zenith-sudoku-save-v1';
+
 const App: React.FC = () => {
   // --- State ---
   const [board, setBoard] = useState<CellData[][]>(createEmptyBoard());
@@ -112,6 +165,68 @@ const App: React.FC = () => {
   const [hintsRemaining, setHintsRemaining] = useState(3);
   const [isProcessingHint, setIsProcessingHint] = useState(false);
   const [hintMessage, setHintMessage] = useState<string | null>(null);
+  const [autoRestartSeconds, setAutoRestartSeconds] = useState(5);
+  
+  // Storage State
+  const [savedGame, setSavedGame] = useState<SavedGame | null>(null);
+
+  // --- Init ---
+  useEffect(() => {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            setSavedGame(JSON.parse(saved));
+        }
+    } catch (e) {
+        console.error("Failed to load save", e);
+    }
+  }, []);
+
+  // --- Auto Save ---
+  useEffect(() => {
+    if (status === 'playing' || status === 'paused') {
+        const gameState: SavedGame = {
+            board,
+            difficulty,
+            timer,
+            mistakes,
+            history,
+            historyIndex,
+            hintsRemaining,
+            date: Date.now()
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(gameState));
+    }
+  }, [board, difficulty, timer, mistakes, history, historyIndex, hintsRemaining, status]);
+
+  // --- Auto-Restart Logic ---
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval>;
+    if (status === 'lost') {
+        // Clear save on loss
+        localStorage.removeItem(STORAGE_KEY);
+        setSavedGame(null);
+
+        setAutoRestartSeconds(5);
+        timer = setInterval(() => {
+            setAutoRestartSeconds(prev => {
+                if (prev <= 1) {
+                    clearInterval(timer);
+                    startNewGame(difficulty);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+    } else if (status === 'won') {
+        // Clear save on win
+        localStorage.removeItem(STORAGE_KEY);
+        setSavedGame(null);
+    }
+    return () => {
+        if(timer) clearInterval(timer);
+    };
+  }, [status, difficulty]);
 
   // --- Timer ---
   useEffect(() => {
@@ -122,10 +237,31 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [status]);
 
+  // --- Computed State: Completed Numbers ---
+  const completedNumbers = useMemo(() => {
+    const counts: Record<number, number> = {};
+    board.forEach(row => {
+        row.forEach(cell => {
+            // Count only valid placements (fixed or correct user input)
+            if (cell.value !== null && !cell.isError) {
+                counts[cell.value] = (counts[cell.value] || 0) + 1;
+            }
+        });
+    });
+    // Return array of numbers that appear 9 times
+    return Object.entries(counts)
+        .filter(([_, count]) => count >= 9)
+        .map(([num]) => parseInt(num));
+  }, [board]);
+
   // --- Game Logic ---
   const startNewGame = useCallback((diff: Difficulty = difficulty) => {
     setStatus('loading');
     setDifficulty(diff);
+    // Clear save when explicitly starting new
+    localStorage.removeItem(STORAGE_KEY);
+    setSavedGame(null);
+
     // Small delay to allow UI to show loading state
     setTimeout(() => {
       const newBoard = generateSudoku(diff);
@@ -140,6 +276,22 @@ const App: React.FC = () => {
       setSelectedPos(null);
     }, 500);
   }, [difficulty]);
+
+  const resumeGame = useCallback(() => {
+    if (!savedGame) return;
+    
+    setStatus('loading');
+    setTimeout(() => {
+        setBoard(savedGame.board);
+        setDifficulty(savedGame.difficulty);
+        setTimer(savedGame.timer);
+        setMistakes(savedGame.mistakes);
+        setHistory(savedGame.history);
+        setHistoryIndex(savedGame.historyIndex);
+        setHintsRemaining(savedGame.hintsRemaining);
+        setStatus('playing');
+    }, 300);
+  }, [savedGame]);
 
   const addToHistory = (newBoard: CellData[][]) => {
     const newHistory = history.slice(0, historyIndex + 1);
@@ -214,9 +366,18 @@ const App: React.FC = () => {
     }
   };
 
-  const handleInput = useCallback((num: number, modeType: 'value' | 'note') => {
-    if (!selectedPos || status !== 'playing') return;
-    const { r, c } = selectedPos;
+  // Modified to accept optional targetPos for direct handwriting input
+  const handleInput = useCallback((num: number, modeType: 'value' | 'note', targetPos?: { r: number, c: number }) => {
+    // If targetPos is passed (handwriting on unselected cell), use it. Otherwise use selectedPos.
+    const pos = targetPos || selectedPos;
+
+    if (!pos || status !== 'playing') return;
+    const { r, c } = pos;
+
+    // If writing on a specific cell, auto-select it for better UX
+    if (targetPos) {
+        setSelectedPos(targetPos);
+    }
 
     // 1. Handle Scratch-out (Erase)
     if (num === -1) {
@@ -228,7 +389,7 @@ const App: React.FC = () => {
     const isNote = modeType === 'note';
     updateCell(r, c, num, isNote);
 
-  }, [board, selectedPos, status, mistakes, difficulty]); // Added dependencies for accurate mistake checking
+  }, [board, selectedPos, status, mistakes, difficulty]);
 
   const handleNumberClick = (num: number) => {
     handleInput(num, inputMode === 'note' ? 'note' : 'value');
@@ -264,6 +425,19 @@ const App: React.FC = () => {
   };
 
   const handleBackToMenu = () => {
+      // Just set to idle. State is already saved by the effect.
+      // We might want to reload the saved game from state to ensure the intro view has the latest.
+      const gameState: SavedGame = {
+          board,
+          difficulty,
+          timer,
+          mistakes,
+          history,
+          historyIndex,
+          hintsRemaining,
+          date: Date.now()
+      };
+      setSavedGame(gameState); // Update the intro view prop immediately
       setStatus('idle');
   }
 
@@ -280,7 +454,7 @@ const App: React.FC = () => {
   // --- RENDER ---
 
   if (status === 'idle') {
-    return <IntroView onStart={startNewGame} />;
+    return <IntroView onStart={startNewGame} onResume={resumeGame} savedGame={savedGame} />;
   }
 
   return (
@@ -358,7 +532,7 @@ const App: React.FC = () => {
                                 mode={inputMode}
                                 displayMode={displayMode}
                                 onClick={() => handleCellClick(r, c)}
-                                onInput={handleInput}
+                                onInput={(val, mode) => handleInput(val, mode, { r, c })}
                             />
                         </div>
                     ))
@@ -372,26 +546,21 @@ const App: React.FC = () => {
                 </div>
              )}
 
-             {/* Lost Overlay */}
+             {/* Lost Overlay with Auto-Restart */}
              {status === 'lost' && (
                 <div className="absolute inset-0 bg-slate-900/95 backdrop-blur-md flex flex-col items-center justify-center z-30 rounded-xl text-white p-6 text-center animate-in zoom-in">
                     <XCircle size={64} className="mb-4 text-rose-500 drop-shadow-lg" />
                     <h2 className="text-3xl font-bold mb-2">Game Over</h2>
                     <p className="text-slate-300 mb-6 max-w-xs mx-auto">
-                        You've reached the limit of <span className="text-rose-400 font-bold">{mistakeLimit}</span> mistakes for this difficulty level.
+                        Too many mistakes. A new puzzle is being prepared.
                     </p>
-                    <div className="flex gap-4">
-                        <button 
-                            onClick={handleBackToMenu}
-                            className="bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-full font-bold shadow-lg transition-colors border border-white/20"
-                        >
-                            Menu
-                        </button>
+                    <div className="flex flex-col items-center gap-4">
                         <button 
                             onClick={() => startNewGame()}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-full font-bold shadow-xl hover:scale-105 transition-transform"
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-full font-bold shadow-xl hover:scale-105 transition-transform flex items-center gap-2"
                         >
-                            Try Again
+                            <RefreshCw size={20} className="animate-spin" style={{ animationDuration: '3s' }} />
+                            Try Again Now ({autoRestartSeconds}s)
                         </button>
                     </div>
                 </div>
@@ -434,6 +603,7 @@ const App: React.FC = () => {
             onHint={handleSmartHint}
             canUndo={historyIndex > 0 && status !== 'lost'}
             hintsRemaining={hintsRemaining}
+            completedNumbers={completedNumbers}
         />
         
         {/* Credits */}
