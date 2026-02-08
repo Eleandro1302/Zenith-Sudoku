@@ -4,7 +4,7 @@ import { getSmartHint } from './services/geminiService';
 import SudokuCell from './components/SudokuCell';
 import Controls from './components/Controls';
 import { CellData, Difficulty, InputMode, DisplayMode, GameState } from './types';
-import { Trophy, Settings, Loader2, Play, Pause, Grid3x3, Flame, Sparkles, Brain, ChevronRight, XCircle, Linkedin, RefreshCw, History, Home, Wand2 } from 'lucide-react';
+import { Trophy, Settings, Loader2, Play, Pause, Grid3x3, Flame, Sparkles, Brain, ChevronRight, XCircle, Linkedin, RefreshCw, History, Home, Wand2, MonitorPlay } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 // --- Types for Storage ---
@@ -166,6 +166,7 @@ const App: React.FC = () => {
   const [hintsRemaining, setHintsRemaining] = useState(3);
   const [isProcessingHint, setIsProcessingHint] = useState(false);
   const [hintMessage, setHintMessage] = useState<string | null>(null);
+  const [isWatchingAd, setIsWatchingAd] = useState(false);
   
   // Storage State
   const [savedGame, setSavedGame] = useState<SavedGame | null>(null);
@@ -230,14 +231,9 @@ const App: React.FC = () => {
     }
   }, [status]);
 
-  // --- Clean up logic on Loss ---
-  useEffect(() => {
-    if (status === 'lost') {
-        // Clear save on loss
-        localStorage.removeItem(STORAGE_KEY);
-        setSavedGame(null);
-    }
-  }, [status]);
+  // --- Clean up logic on Loss (Moved to manual dismiss or new game to allow Revive) ---
+  // We don't immediately clear storage on 'lost' anymore to allow the Ad revive mechanic to work.
+  // The clearing happens if they choose "New Game" from the lost screen.
 
   // --- Timer ---
   useEffect(() => {
@@ -491,6 +487,18 @@ const App: React.FC = () => {
       setStatus('idle');
   }
 
+  // --- Ad & Revive Logic ---
+  const handleWatchAd = () => {
+    setIsWatchingAd(true);
+    // Simulate Ad duration (5 seconds)
+    setTimeout(() => {
+        // Success callback
+        setIsWatchingAd(false);
+        setMistakes(m => Math.max(0, m - 2)); // Restore 2 lives (remove 2 mistakes)
+        setStatus('playing');
+    }, 5000);
+  };
+
   // --- Render Helpers ---
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -610,20 +618,57 @@ const App: React.FC = () => {
                 </div>
              )}
 
+             {/* AD WATCHING OVERLAY */}
+             {isWatchingAd && (
+                <div className="absolute inset-0 bg-black z-50 flex flex-col items-center justify-center text-white rounded-xl">
+                    <div className="w-full max-w-xs bg-slate-800 p-6 rounded-2xl text-center space-y-4">
+                        <div className="animate-pulse flex flex-col items-center gap-2">
+                             <div className="w-12 h-12 rounded-full border-4 border-t-indigo-500 border-r-indigo-500 border-b-indigo-900 border-l-indigo-900 animate-spin" />
+                             <h3 className="text-xl font-bold">Advertisement</h3>
+                             <p className="text-sm text-slate-400">Resuming game in a few seconds...</p>
+                        </div>
+                        <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
+                            <div className="h-full bg-indigo-500 w-full origin-left animate-[shrink_5s_linear]" />
+                        </div>
+                        <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Sponsored</p>
+                    </div>
+                </div>
+             )}
+
              {/* Lost Overlay */}
-             {status === 'lost' && (
+             {status === 'lost' && !isWatchingAd && (
                 <div className="absolute inset-0 bg-slate-900/95 backdrop-blur-md flex flex-col items-center justify-center z-30 rounded-xl text-white p-6 text-center animate-in zoom-in">
                     <XCircle size={64} className="mb-4 text-rose-500 drop-shadow-lg" />
                     <h2 className="text-3xl font-bold mb-2">Game Over</h2>
                     <p className="text-slate-300 mb-6 max-w-xs mx-auto">
-                        Too many mistakes. Better luck next time.
+                        You hit the mistake limit.
                     </p>
-                    <div className="flex flex-col items-center gap-4">
+                    
+                    <div className="flex flex-col items-center gap-3 w-full max-w-xs">
+                        {/* Revive Button */}
                         <button 
-                            onClick={() => setStatus('idle')}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-full font-bold shadow-xl hover:scale-105 transition-transform flex items-center gap-2"
+                            onClick={handleWatchAd}
+                            className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white px-6 py-4 rounded-xl font-bold shadow-xl shadow-indigo-900/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 group border border-white/10"
                         >
-                            <RefreshCw size={20} />
+                            <MonitorPlay size={20} className="group-hover:animate-pulse" />
+                            <span>Watch Ad (+2 Lives)</span>
+                        </button>
+
+                        <div className="flex items-center w-full gap-2 my-1">
+                             <div className="h-px bg-slate-700 flex-1" />
+                             <span className="text-xs text-slate-500 uppercase font-bold">Or</span>
+                             <div className="h-px bg-slate-700 flex-1" />
+                        </div>
+
+                        {/* New Game Button */}
+                        <button 
+                            onClick={() => {
+                                localStorage.removeItem(STORAGE_KEY);
+                                setStatus('idle');
+                            }}
+                            className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 px-6 py-3 rounded-xl font-bold shadow-lg transition-transform flex items-center justify-center gap-2"
+                        >
+                            <RefreshCw size={18} />
                             New Game
                         </button>
                     </div>
