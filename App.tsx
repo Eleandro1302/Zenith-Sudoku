@@ -4,7 +4,7 @@ import { getSmartHint } from './services/geminiService';
 import SudokuCell from './components/SudokuCell';
 import Controls from './components/Controls';
 import { CellData, Difficulty, InputMode, DisplayMode, GameState } from './types';
-import { Trophy, Settings, Loader2, Play, Pause, Grid3x3, Flame, Sparkles, Brain, ChevronRight, XCircle, Linkedin, RefreshCw, History } from 'lucide-react';
+import { Trophy, Settings, Loader2, Play, Pause, Grid3x3, Flame, Sparkles, Brain, ChevronRight, XCircle, Linkedin, RefreshCw, History, Home, Wand2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 // --- Types for Storage ---
@@ -126,7 +126,7 @@ const IntroView: React.FC<{
 
       {/* Footer */}
       <div className="mt-12 flex flex-col items-center gap-4">
-        <span className="text-slate-400 text-sm font-medium opacity-60">v1.3.0</span>
+        <span className="text-slate-400 text-sm font-medium opacity-60">v1.3.1</span>
         <a 
           href="https://www.linkedin.com/in/eleandro-mangrich?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=ios_app" 
           target="_blank" 
@@ -166,7 +166,6 @@ const App: React.FC = () => {
   const [hintsRemaining, setHintsRemaining] = useState(3);
   const [isProcessingHint, setIsProcessingHint] = useState(false);
   const [hintMessage, setHintMessage] = useState<string | null>(null);
-  const [autoRestartSeconds, setAutoRestartSeconds] = useState(5);
   
   // Storage State
   const [savedGame, setSavedGame] = useState<SavedGame | null>(null);
@@ -231,30 +230,14 @@ const App: React.FC = () => {
     }
   }, [status]);
 
-  // --- Auto-Restart Logic (Loss only) ---
+  // --- Clean up logic on Loss ---
   useEffect(() => {
-    let timer: ReturnType<typeof setInterval>;
     if (status === 'lost') {
         // Clear save on loss
         localStorage.removeItem(STORAGE_KEY);
         setSavedGame(null);
-
-        setAutoRestartSeconds(5);
-        timer = setInterval(() => {
-            setAutoRestartSeconds(prev => {
-                if (prev <= 1) {
-                    clearInterval(timer);
-                    startNewGame(difficulty);
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
     }
-    return () => {
-        if(timer) clearInterval(timer);
-    };
-  }, [status, difficulty]);
+  }, [status]);
 
   // --- Timer ---
   useEffect(() => {
@@ -265,21 +248,37 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [status]);
 
-  // --- Computed State: Completed Numbers ---
-  const completedNumbers = useMemo(() => {
+  // --- Computed State: Completed Numbers & Empty Count & Remaining Counts ---
+  const { completedNumbers, remainingCounts, emptyCellsCount } = useMemo(() => {
     const counts: Record<number, number> = {};
+    let emptyCount = 0;
+    
+    // Initialize with 0
+    for(let i=1; i<=9; i++) counts[i] = 0;
+
     board.forEach(row => {
         row.forEach(cell => {
-            // Count only valid placements (fixed or correct user input)
-            if (cell.value !== null && !cell.isError) {
+            if (cell.value === null) {
+                emptyCount++;
+            } else if (!cell.isError) {
                 counts[cell.value] = (counts[cell.value] || 0) + 1;
             }
         });
     });
-    // Return array of numbers that appear 9 times
-    return Object.entries(counts)
-        .filter(([_, count]) => count >= 9)
-        .map(([num]) => parseInt(num));
+
+    const completed: number[] = [];
+    const remaining: Record<number, number> = {};
+
+    for(let i=1; i<=9; i++) {
+        if (counts[i] >= 9) {
+            completed.push(i);
+            remaining[i] = 0;
+        } else {
+            remaining[i] = 9 - counts[i];
+        }
+    }
+
+    return { completedNumbers: completed, remainingCounts: remaining, emptyCellsCount: emptyCount };
   }, [board]);
 
   // --- Game Logic ---
@@ -383,6 +382,29 @@ const App: React.FC = () => {
     if (!isNote && value !== null && status !== 'lost') {
         checkWin(newBoard);
     }
+  };
+
+  const handleAutoFinish = () => {
+     // Find the empty cell
+     const newBoard = board.map(row => row.map(cell => ({ ...cell })));
+     let changed = false;
+
+     newBoard.forEach(row => {
+         row.forEach(cell => {
+             if (cell.value === null) {
+                 cell.value = cell.solution;
+                 cell.notes = [];
+                 cell.isError = false;
+                 changed = true;
+             }
+         });
+     });
+
+     if (changed) {
+         setBoard(newBoard);
+         addToHistory(newBoard);
+         checkWin(newBoard);
+     }
   };
 
   const checkWin = (currentBoard: CellData[][]) => {
@@ -539,6 +561,20 @@ const App: React.FC = () => {
       {/* Grid */}
       <main className="flex-1 flex flex-col items-center justify-center p-2 sm:p-4">
         <div className="relative w-full max-w-xl aspect-square bg-slate-900 dark:bg-slate-950 rounded-xl shadow-2xl p-1 sm:p-2 border border-slate-200 dark:border-slate-800">
+             
+             {/* Auto Finish Button (Overlays Grid Bottom) */}
+             {status === 'playing' && emptyCellsCount <= 5 && emptyCellsCount > 0 && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 animate-in zoom-in slide-in-from-bottom-2 duration-300">
+                     <button
+                        onClick={handleAutoFinish}
+                        className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 text-white px-6 py-3 rounded-full font-bold shadow-xl shadow-indigo-500/40 hover:scale-105 active:scale-95 transition-all ring-2 ring-white/20"
+                     >
+                        <Wand2 size={20} className="animate-pulse" />
+                        <span>Auto Finish ({emptyCellsCount})</span>
+                     </button>
+                </div>
+             )}
+
              {/* Board Container */}
              <div className="w-full h-full grid grid-cols-9 grid-rows-9 gap-px bg-slate-300 dark:bg-slate-700 border-2 border-slate-800 dark:border-slate-600 rounded-lg overflow-hidden">
                 {board.map((row, r) => 
@@ -574,21 +610,21 @@ const App: React.FC = () => {
                 </div>
              )}
 
-             {/* Lost Overlay with Auto-Restart */}
+             {/* Lost Overlay */}
              {status === 'lost' && (
                 <div className="absolute inset-0 bg-slate-900/95 backdrop-blur-md flex flex-col items-center justify-center z-30 rounded-xl text-white p-6 text-center animate-in zoom-in">
                     <XCircle size={64} className="mb-4 text-rose-500 drop-shadow-lg" />
                     <h2 className="text-3xl font-bold mb-2">Game Over</h2>
                     <p className="text-slate-300 mb-6 max-w-xs mx-auto">
-                        Too many mistakes. A new puzzle is being prepared.
+                        Too many mistakes. Better luck next time.
                     </p>
                     <div className="flex flex-col items-center gap-4">
                         <button 
-                            onClick={() => startNewGame()}
+                            onClick={() => setStatus('idle')}
                             className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-full font-bold shadow-xl hover:scale-105 transition-transform flex items-center gap-2"
                         >
-                            <RefreshCw size={20} className="animate-spin" style={{ animationDuration: '3s' }} />
-                            Try Again Now ({autoRestartSeconds}s)
+                            <RefreshCw size={20} />
+                            New Game
                         </button>
                     </div>
                 </div>
@@ -608,10 +644,10 @@ const App: React.FC = () => {
                             Menu
                         </button>
                         <button 
-                            onClick={() => startNewGame()}
-                            className="bg-white text-indigo-600 px-8 py-3 rounded-full font-bold shadow-xl hover:scale-105 transition-transform"
+                            onClick={() => setStatus('idle')}
+                            className="bg-white text-indigo-600 px-8 py-3 rounded-full font-bold shadow-xl hover:scale-105 transition-transform flex items-center gap-2"
                         >
-                            Play Again
+                            <RefreshCw size={18} /> New Game
                         </button>
                     </div>
                 </div>
@@ -632,6 +668,7 @@ const App: React.FC = () => {
             canUndo={historyIndex > 0 && status !== 'lost'}
             hintsRemaining={hintsRemaining}
             completedNumbers={completedNumbers}
+            remainingCounts={remainingCounts}
         />
         
         {/* Credits */}
