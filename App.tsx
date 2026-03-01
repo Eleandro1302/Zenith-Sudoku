@@ -144,6 +144,36 @@ const IntroView: React.FC<{
             <Linkedin size={14} className="stroke-[2.5]" />
         </a>
       </div>
+
+      {/* SEO Rich Content Section */}
+      <div className="mt-24 max-w-3xl mx-auto text-left space-y-8 pb-16 px-4 border-t border-slate-200 dark:border-slate-800 pt-16">
+        <div className="prose dark:prose-invert prose-slate max-w-none">
+          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-200 mb-4">About Zenith Sudoku</h2>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-6">
+            Zenith Sudoku is a premium, free-to-play online logic puzzle game designed to challenge your brain and provide a relaxing, ad-supported experience. Whether you are a beginner looking to learn the ropes or a master seeking a hard challenge, our platform offers the perfect grid for you. Play Sudoku online daily to improve your logical thinking and memory.
+          </p>
+
+          <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-3 mt-8">How to Play Sudoku</h3>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
+            The rules of Sudoku are simple, yet the game can be incredibly complex. The objective is to fill a 9x9 grid with digits so that each column, each row, and each of the nine 3x3 subgrids that compose the grid (also called "boxes", "blocks", or "regions") contain all of the digits from 1 to 9. The puzzle setter provides a partially completed grid, which for a well-posed puzzle has a single solution.
+          </p>
+          <ul className="list-disc pl-6 text-slate-600 dark:text-slate-400 space-y-2 mb-6">
+            <li><strong>Rule 1:</strong> Each row must contain the numbers from 1 to 9, without repetitions.</li>
+            <li><strong>Rule 2:</strong> Each column must contain the numbers from 1 to 9, without repetitions.</li>
+            <li><strong>Rule 3:</strong> The digits can only occur once per block (3x3 grid).</li>
+          </ul>
+
+          <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-3 mt-8">Benefits of Playing Sudoku</h3>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-6">
+            Regularly playing Sudoku can have profound benefits for your cognitive health. It improves memory, stimulates your mind, reduces the chances of developing cognitive decline by keeping your brain active, helps you learn to do things quickly, increases your concentration power, and makes you feel happy by giving you a sense of accomplishment.
+          </p>
+
+          <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-3 mt-8">Advanced Strategies</h3>
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-6">
+            Once you master the basics, you can move on to advanced techniques like <em>Crosshatching</em>, <em>Naked Pairs</em>, and <em>X-Wings</em>. Crosshatching involves scanning rows and columns to eliminate where a specific number can go in a given region. Naked pairs occur when two cells in a row, column, or block can only contain the same two numbers, meaning those numbers can be removed from all other cells in that group.
+          </p>
+        </div>
+      </div>
     </div>
   );
 };
