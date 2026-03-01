@@ -4,7 +4,7 @@ import { getSmartHint } from './services/geminiService';
 import SudokuCell from './components/SudokuCell';
 import Controls from './components/Controls';
 import { CellData, Difficulty, InputMode, DisplayMode, GameState } from './types';
-import { Trophy, Settings, Loader2, Play, Pause, Grid3x3, Flame, Sparkles, Brain, ChevronRight, XCircle, Linkedin, RefreshCw, History, Home, Wand2, MonitorPlay } from 'lucide-react';
+import { Trophy, Settings, Loader2, Play, Pause, Grid3x3, Flame, Sparkles, Brain, ChevronRight, XCircle, Linkedin, RefreshCw, History, Home, Wand2, MonitorPlay, Shield, FileText } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 // --- Types for Storage ---
@@ -23,8 +23,10 @@ interface SavedGame {
 const IntroView: React.FC<{ 
   onStart: (diff: Difficulty) => void, 
   onResume: () => void,
-  savedGame: SavedGame | null 
-}> = ({ onStart, onResume, savedGame }) => {
+  savedGame: SavedGame | null,
+  onShowPrivacy: () => void,
+  onShowTerms: () => void
+}> = ({ onStart, onResume, savedGame, onShowPrivacy, onShowTerms }) => {
   const [selectedDiff, setSelectedDiff] = useState<Difficulty>('Easy');
 
   const formatTime = (seconds: number) => {
@@ -127,6 +129,11 @@ const IntroView: React.FC<{
       {/* Footer */}
       <div className="mt-12 flex flex-col items-center gap-4">
         <span className="text-slate-400 text-sm font-medium opacity-60">v1.3.1</span>
+        <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400 font-medium">
+          <button onClick={onShowPrivacy} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Privacy Policy</button>
+          <span>&bull;</span>
+          <button onClick={onShowTerms} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Terms of Use</button>
+        </div>
         <a 
           href="https://www.linkedin.com/in/eleandro-mangrich?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=ios_app" 
           target="_blank" 
@@ -167,6 +174,13 @@ const App: React.FC = () => {
   const [isProcessingHint, setIsProcessingHint] = useState(false);
   const [hintMessage, setHintMessage] = useState<string | null>(null);
   const [isWatchingAd, setIsWatchingAd] = useState(false);
+  
+  // Policy Modals & Cookie Consent
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+  const [hasConsentedToCookies, setHasConsentedToCookies] = useState(() => {
+    return localStorage.getItem('zenith-cookie-consent') === 'true';
+  });
   
   // Storage State
   const [savedGame, setSavedGame] = useState<SavedGame | null>(null);
@@ -511,12 +525,13 @@ const App: React.FC = () => {
 
   // --- RENDER ---
 
-  if (status === 'idle') {
-    return <IntroView onStart={startNewGame} onResume={resumeGame} savedGame={savedGame} />;
-  }
+  const renderContent = () => {
+    if (status === 'idle') {
+      return <IntroView onStart={startNewGame} onResume={resumeGame} savedGame={savedGame} onShowPrivacy={() => setShowPrivacy(true)} onShowTerms={() => setShowTerms(true)} />;
+    }
 
-  return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans selection:bg-indigo-100 touch-pan-y animate-in fade-in slide-in-from-bottom-4 duration-500">
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans selection:bg-indigo-100 touch-pan-y animate-in fade-in slide-in-from-bottom-4 duration-500">
       
       {/* Header */}
       <header className="px-4 py-4 flex items-center justify-between max-w-xl mx-auto">
@@ -717,17 +732,114 @@ const App: React.FC = () => {
         />
         
         {/* Credits */}
-        <a 
-          href="https://www.linkedin.com/in/eleandro-mangrich?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=ios_app" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-100 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 text-xs font-medium hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-300 transition-all duration-300 border border-transparent hover:border-indigo-100 dark:hover:border-indigo-800/50 group"
-        >
-            <span>Developed by <span className="text-slate-700 dark:text-slate-200 group-hover:text-indigo-700 dark:group-hover:text-indigo-300 font-semibold transition-colors">Eleandro</span></span>
-            <Linkedin size={14} className="stroke-[2.5]" />
-        </a>
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400 font-medium">
+            <button onClick={() => setShowPrivacy(true)} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Privacy Policy</button>
+            <span>&bull;</span>
+            <button onClick={() => setShowTerms(true)} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Terms of Use</button>
+          </div>
+          <a 
+            href="https://www.linkedin.com/in/eleandro-mangrich?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=ios_app" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-100 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 text-xs font-medium hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-300 transition-all duration-300 border border-transparent hover:border-indigo-100 dark:hover:border-indigo-800/50 group"
+          >
+              <span>Developed by <span className="text-slate-700 dark:text-slate-200 group-hover:text-indigo-700 dark:group-hover:text-indigo-300 font-semibold transition-colors">Eleandro</span></span>
+              <Linkedin size={14} className="stroke-[2.5]" />
+          </a>
+        </div>
       </footer>
     </div>
+  );
+  };
+
+  return (
+    <>
+      {renderContent()}
+
+      {/* Cookie Banner */}
+      {!hasConsentedToCookies && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 z-50 animate-in slide-in-from-bottom-4">
+          <div className="max-w-3xl mx-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl rounded-2xl p-4 sm:p-6 flex flex-col sm:flex-row items-center gap-4 justify-between">
+            <div className="text-sm text-slate-600 dark:text-slate-300">
+              We use cookies to personalize content and ads, to provide social media features and to analyze our traffic. We also share information about your use of our site with our social media, advertising and analytics partners.
+            </div>
+            <div className="flex gap-3 shrink-0">
+              <button 
+                onClick={() => {
+                  localStorage.setItem('zenith-cookie-consent', 'true');
+                  setHasConsentedToCookies(true);
+                }}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold transition-colors whitespace-nowrap"
+              >
+                Accept All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Privacy Policy Modal */}
+      {showPrivacy && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-2xl max-h-[80vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800">
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                  <Shield size={20} />
+                </div>
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white">Privacy Policy</h2>
+              </div>
+              <button onClick={() => setShowPrivacy(false)} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-full transition-colors">
+                <XCircle size={24} />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto text-sm text-slate-600 dark:text-slate-300 space-y-4 prose dark:prose-invert max-w-none">
+              <p><strong>Last Updated:</strong> March 2026</p>
+              <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200">1. Information We Collect</h3>
+              <p>We collect information to provide better services to our users. This includes basic usage data and information required for advertising purposes.</p>
+              <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200">2. Use of Cookies and Tracking Technologies</h3>
+              <p>We use cookies and similar tracking technologies to track the activity on our application and hold certain information. We use Google AdSense to display ads. Google, as a third-party vendor, uses cookies to serve ads on our site. Google's use of advertising cookies enables it and its partners to serve ads to our users based on their visit to our site and/or other sites on the Internet.</p>
+              <p>Users may opt out of personalized advertising by visiting <a href="https://myadcenter.google.com/" target="_blank" rel="noopener noreferrer" className="text-indigo-600 dark:text-indigo-400 hover:underline">Google Ads Settings</a>.</p>
+              <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200">3. Data Storage</h3>
+              <p>Your game progress and settings are stored locally on your device using localStorage. We do not transmit this data to our servers.</p>
+              <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200">4. Third-Party Links</h3>
+              <p>Our application may contain links to other sites that are not operated by us. If you click on a third-party link, you will be directed to that third party's site. We strongly advise you to review the Privacy Policy of every site you visit.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Terms of Use Modal */}
+      {showTerms && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-2xl max-h-[80vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800">
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                  <FileText size={20} />
+                </div>
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white">Terms of Use</h2>
+              </div>
+              <button onClick={() => setShowTerms(false)} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-full transition-colors">
+                <XCircle size={24} />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto text-sm text-slate-600 dark:text-slate-300 space-y-4 prose dark:prose-invert max-w-none">
+              <p><strong>Last Updated:</strong> March 2026</p>
+              <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200">1. Acceptance of Terms</h3>
+              <p>By accessing and using Zenith Sudoku, you accept and agree to be bound by the terms and provision of this agreement.</p>
+              <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200">2. Use License</h3>
+              <p>Permission is granted to temporarily play the game on Zenith Sudoku's website for personal, non-commercial transitory viewing only.</p>
+              <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200">3. Disclaimer</h3>
+              <p>The materials on Zenith Sudoku's website are provided on an 'as is' basis. We make no warranties, expressed or implied, and hereby disclaim and negate all other warranties including, without limitation, implied warranties or conditions of merchantability, fitness for a particular purpose, or non-infringement of intellectual property or other violation of rights.</p>
+              <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200">4. Limitations</h3>
+              <p>In no event shall Zenith Sudoku or its suppliers be liable for any damages (including, without limitation, damages for loss of data or profit, or due to business interruption) arising out of the use or inability to use the materials on Zenith Sudoku's website.</p>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 
