@@ -133,6 +133,8 @@ const IntroView: React.FC<{
           <button onClick={onShowPrivacy} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Privacy Policy</button>
           <span>&bull;</span>
           <button onClick={onShowTerms} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Terms of Use</button>
+          <span>&bull;</span>
+          <a href="mailto:eleandro1302@gmail.com" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Contact</a>
         </div>
         <a 
           href="https://www.linkedin.com/in/eleandro-mangrich?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=ios_app" 
@@ -767,6 +769,8 @@ const App: React.FC = () => {
             <button onClick={() => setShowPrivacy(true)} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Privacy Policy</button>
             <span>&bull;</span>
             <button onClick={() => setShowTerms(true)} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Terms of Use</button>
+            <span>&bull;</span>
+            <a href="mailto:eleandro1302@gmail.com" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Contact</a>
           </div>
           <a 
             href="https://www.linkedin.com/in/eleandro-mangrich?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=ios_app" 
@@ -835,6 +839,8 @@ const App: React.FC = () => {
               <p>Your game progress and settings are stored locally on your device using localStorage. We do not transmit this data to our servers.</p>
               <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200">4. Third-Party Links</h3>
               <p>Our application may contain links to other sites that are not operated by us. If you click on a third-party link, you will be directed to that third party's site. We strongly advise you to review the Privacy Policy of every site you visit.</p>
+              <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200">5. Contact Us</h3>
+              <p>If you have any questions about this Privacy Policy, please contact us at: <strong>eleandro1302@gmail.com</strong></p>
             </div>
           </div>
         </div>
